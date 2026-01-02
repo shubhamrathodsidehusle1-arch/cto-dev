@@ -12,7 +12,7 @@ datasource db {
 model Job {
   id                String    @id @default(cuid())
   userId            String
-  status            String    @default("queued") // queued, processing, completed, failed
+  status            String    @default("queued") // queued, processing, completed, failed, cancelled
   prompt            String
   metadata          Json?
   result            Json?
@@ -20,6 +20,7 @@ model Job {
   completedAt       DateTime?
   retryCount        Int       @default(0)
   maxRetries        Int       @default(3)
+  celeryTaskId      String?
   usedProvider      String?
   usedModel         String?
   generationTimeMs  Int?

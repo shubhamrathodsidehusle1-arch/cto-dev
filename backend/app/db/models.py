@@ -112,7 +112,8 @@ async def update_job_status(
     result: Optional[Dict[str, Any]] = None,
     used_provider: Optional[str] = None,
     used_model: Optional[str] = None,
-    generation_time_ms: Optional[int] = None
+    generation_time_ms: Optional[int] = None,
+    celery_task_id: Optional[str] = None
 ) -> Job:
     """Update job status.
     
@@ -125,6 +126,7 @@ async def update_job_status(
         used_provider: Provider used
         used_model: Model used
         generation_time_ms: Generation time in milliseconds
+        celery_task_id: Celery task ID
         
     Returns:
         Updated job
@@ -150,6 +152,8 @@ async def update_job_status(
             data["usedModel"] = used_model
         if generation_time_ms:
             data["generationTimeMs"] = generation_time_ms
+        if celery_task_id:
+            data["celeryTaskId"] = celery_task_id
         
         job = await db.job.update(
             where={"id": job_id},
@@ -178,6 +182,52 @@ async def delete_job(db: Any, job_id: str) -> None:
     except Exception as e:
         logger.error("Failed to delete job", job_id=job_id, error=str(e))
         raise DatabaseError(f"Failed to delete job: {str(e)}")
+
+
+async def get_job_stats(db: Any, user_id: Optional[str] = None) -> Dict[str, Any]:
+    """Get job statistics.
+    
+    Args:
+        db: Prisma client
+        user_id: Filter by user ID
+        
+    Returns:
+        Job statistics
+    """
+    try:
+        where: Dict[str, Any] = {}
+        if user_id:
+            where["userId"] = user_id
+            
+        total = await db.job.count(where=where)
+        
+        statuses = ["queued", "processing", "completed", "failed", "cancelled"]
+        by_status = {}
+        for status in statuses:
+            where_status = {**where, "status": status}
+            by_status[status] = await db.job.count(where=where_status)
+            
+        completed = by_status.get("completed", 0)
+        failed = by_status.get("failed", 0)
+        success_rate = (completed / (completed + failed)) if (completed + failed) > 0 else 0
+        
+        # Average generation time for completed jobs
+        avg_gen_time = 0
+        completed_jobs = await db.job.find_many(
+            where={**where, "status": "completed", "generationTimeMs": {"not": None}},
+        )
+        if completed_jobs:
+            avg_gen_time = sum(j.generationTimeMs for j in completed_jobs if j.generationTimeMs) / len(completed_jobs)
+            
+        return {
+            "total": total,
+            "by_status": by_status,
+            "success_rate": success_rate,
+            "avg_generation_time_ms": avg_gen_time
+        }
+    except Exception as e:
+        logger.error("Failed to get job stats", error=str(e))
+        raise DatabaseError(f"Failed to get job stats: {str(e)}")
 
 
 async def update_provider_health(

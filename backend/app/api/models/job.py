@@ -24,6 +24,7 @@ class JobResponse(BaseModel):
     completedAt: Optional[datetime]
     retryCount: int
     maxRetries: int
+    celeryTaskId: Optional[str] = None
     usedProvider: Optional[str]
     usedModel: Optional[str]
     generationTimeMs: Optional[int]
@@ -46,6 +47,14 @@ class JobListResponse(BaseModel):
 
 class JobStatusUpdate(BaseModel):
     """Job status update request."""
-    status: str = Field(..., pattern="^(queued|processing|completed|failed)$")
+    status: str = Field(..., pattern="^(queued|processing|completed|failed|cancelled)$")
     errorMessage: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
+
+
+class JobStatsResponse(BaseModel):
+    """Job statistics response."""
+    total: int
+    by_status: Dict[str, int]
+    success_rate: float
+    avg_generation_time_ms: Optional[float]
