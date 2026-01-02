@@ -1,0 +1,68 @@
+generator client {
+  provider             = "prisma-client-py"
+  interface            = "asyncio"
+  recursive_type_depth = 5
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Job {
+  id                String    @id @default(cuid())
+  userId            String
+  status            String    @default("queued") // queued, processing, completed, failed
+  prompt            String
+  metadata          Json?
+  result            Json?
+  startedAt         DateTime?
+  completedAt       DateTime?
+  retryCount        Int       @default(0)
+  maxRetries        Int       @default(3)
+  usedProvider      String?
+  usedModel         String?
+  generationTimeMs  Int?
+  errorMessage      String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  metrics           Metric[]
+  
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([userId, status])
+  @@map("jobs")
+}
+
+model ProviderHealth {
+  id                   String   @id @default(cuid())
+  provider             String   @unique
+  status               String   @default("unknown") // healthy, degraded, unhealthy, unknown
+  lastCheckedAt        DateTime @default(now())
+  lastErrorMessage     String?
+  consecutiveFailures  Int      @default(0)
+  avgResponseTimeMs    Int?
+  costPerRequest       Float?
+  updatedAt            DateTime @updatedAt
+  
+  @@map("provider_health")
+}
+
+model Metric {
+  id        String   @id @default(cuid())
+  jobId     String?
+  timestamp DateTime @default(now())
+  component String   // api, worker, database, provider
+  metric    String   // queue_depth, processing_time, completion_rate, etc.
+  value     Float
+  tags      Json?
+  
+  job       Job?     @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  
+  @@index([jobId])
+  @@index([timestamp])
+  @@index([component, metric])
+  @@map("metrics")
+}
