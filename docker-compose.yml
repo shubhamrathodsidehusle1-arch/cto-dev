@@ -112,6 +112,21 @@ services:
     networks:
       - ai-video-network
 
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: ai-video-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_KEY=development-api-key-change-in-production
+    depends_on:
+      - api
+    networks:
+      - ai-video-network
+
 volumes:
   postgres_data:
   redis_data:
