@@ -9,7 +9,7 @@ class JobCreate(BaseModel):
     userId: str = Field(..., description="User ID")
     prompt: str = Field(..., min_length=1, max_length=5000, description="Video generation prompt")
     metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
-    maxRetries: int = Field(default=3, ge=0, le=10, description="Maximum retry attempts")
+    maxRetries: Optional[int] = Field(default=None, ge=0, le=10, description="Maximum retry attempts")
 
 
 class JobResponse(BaseModel):

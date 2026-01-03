@@ -7,7 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.db.prisma import get_prisma, disconnect_prisma
-from app.api.routes import jobs, health, providers
+from app.db.metadata import load_metadata
+from app.api.routes import jobs, health, providers, metadata
 from app.api.middleware.error_handler import ErrorHandlerMiddleware
 from app.api.middleware.request_validation import RequestValidationMiddleware
 from app.utils.logger import get_logger
@@ -29,6 +30,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     
     await get_prisma()
     logger.info("Database connected")
+    
+    # Load metadata
+    await load_metadata()
+    logger.info("Metadata loaded")
     
     yield
     
@@ -59,6 +64,7 @@ app.add_middleware(RequestValidationMiddleware)
 app.include_router(health.router)
 app.include_router(jobs.router, prefix=f"/api/{settings.API_VERSION}")
 app.include_router(providers.router, prefix=f"/api/{settings.API_VERSION}")
+app.include_router(metadata.router, prefix=f"/api/{settings.API_VERSION}")
 
 
 @app.get("/")

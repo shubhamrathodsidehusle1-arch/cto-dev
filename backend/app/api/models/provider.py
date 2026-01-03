@@ -14,6 +14,7 @@ class ProviderHealthResponse(BaseModel):
     consecutiveFailures: int
     avgResponseTimeMs: Optional[int]
     costPerRequest: Optional[float]
+    metadata: Optional[dict] = None
     updatedAt: datetime
     
     class Config:

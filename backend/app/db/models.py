@@ -10,12 +10,30 @@ from app.utils.logger import get_logger
 logger = get_logger(__name__)
 
 
+async def get_system_metadata(db: Any, key: str) -> Optional[Any]:
+    """Get system metadata by key.
+    
+    Args:
+        db: Prisma client
+        key: Metadata key
+        
+    Returns:
+        Metadata value or None if not found
+    """
+    try:
+        metadata = await db.systemmetadata.find_unique(where={"key": key})
+        return metadata.value if metadata else None
+    except Exception as e:
+        logger.error("Failed to get system metadata", key=key, error=str(e))
+        return None
+
+
 async def create_job(
     db: Any,
     user_id: str,
     prompt: str,
     metadata: Optional[Dict[str, Any]] = None,
-    max_retries: int = 3
+    max_retries: Optional[int] = None
 ) -> Job:
     """Create a new job.
     
@@ -24,7 +42,7 @@ async def create_job(
         user_id: User ID
         prompt: Video generation prompt
         metadata: Additional metadata
-        max_retries: Maximum retry attempts
+        max_retries: Maximum retry attempts (overrides system default)
         
     Returns:
         Created job
@@ -33,6 +51,9 @@ async def create_job(
         DatabaseError: If job creation fails
     """
     try:
+        if max_retries is None:
+            max_retries = await get_system_metadata(db, "default_max_retries") or 3
+            
         job = await db.job.create(
             data={
                 "userId": user_id,
@@ -236,7 +257,8 @@ async def update_provider_health(
     status: str,
     error_message: Optional[str] = None,
     response_time_ms: Optional[int] = None,
-    cost_per_request: Optional[float] = None
+    cost_per_request: Optional[float] = None,
+    metadata: Optional[Dict[str, Any]] = None
 ) -> ProviderHealth:
     """Update provider health status.
     
@@ -247,6 +269,7 @@ async def update_provider_health(
         error_message: Error message if unhealthy
         response_time_ms: Average response time
         cost_per_request: Cost per request
+        metadata: Provider metadata
         
     Returns:
         Updated provider health
@@ -270,6 +293,8 @@ async def update_provider_health(
             data["avgResponseTimeMs"] = response_time_ms
         if cost_per_request:
             data["costPerRequest"] = cost_per_request
+        if metadata:
+            data["metadata"] = metadata
         
         health = await db.providerhealth.upsert(
             where={"provider": provider},
