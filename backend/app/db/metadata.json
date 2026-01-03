@@ -1,0 +1,43 @@
+{
+  "providers": [
+    {
+      "provider": "openai",
+      "status": "healthy",
+      "costPerRequest": 0.5,
+      "metadata": {
+        "models": ["sora"],
+        "capabilities": ["video-generation", "image-to-video"]
+      }
+    },
+    {
+      "provider": "runway",
+      "status": "healthy",
+      "costPerRequest": 0.3,
+      "metadata": {
+        "models": ["gen-2"],
+        "capabilities": ["video-generation", "video-to-video"]
+      }
+    },
+    {
+      "provider": "stability",
+      "status": "healthy",
+      "costPerRequest": 0.2,
+      "metadata": {
+        "models": ["stable-video-diffusion"],
+        "capabilities": ["video-generation"]
+      }
+    }
+  ],
+  "system_config": [
+    {
+      "key": "default_max_retries",
+      "value": 3,
+      "description": "Default maximum number of retries for a job"
+    },
+    {
+      "key": "job_cleanup_days",
+      "value": 7,
+      "description": "Number of days to keep completed/failed jobs"
+    }
+  ]
+}

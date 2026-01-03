@@ -46,9 +46,20 @@ model ProviderHealth {
   consecutiveFailures  Int      @default(0)
   avgResponseTimeMs    Int?
   costPerRequest       Float?
+  metadata             Json?
   updatedAt            DateTime @updatedAt
   
   @@map("provider_health")
+}
+
+model SystemMetadata {
+  id        String   @id @default(cuid())
+  key       String   @unique
+  value     Json
+  description String?
+  updatedAt DateTime @updatedAt
+  
+  @@map("system_metadata")
 }
 
 model Metric {

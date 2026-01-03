@@ -129,6 +129,24 @@ def process_video_generation(self: Task, job_id: str) -> Dict[str, Any]:
             
             logger.info("Processing job", job_id=job_id, prompt=job.prompt[:100])
             
+            # Pick a healthy provider
+            from app.db.models import get_provider_health
+            providers = await get_provider_health(db=db)
+            healthy_providers = [p for p in providers if p.status == "healthy"]
+            
+            if healthy_providers:
+                # Simple selection logic - pick first healthy provider
+                selected_provider = healthy_providers[0]
+                provider_name = selected_provider.provider
+                # Pick first model if metadata exists
+                if selected_provider.metadata and "models" in selected_provider.metadata and selected_provider.metadata["models"]:
+                    model_name = selected_provider.metadata["models"][0]
+                else:
+                    model_name = "default-model"
+            else:
+                provider_name = "mock_provider"
+                model_name = "mock_model"
+            
             time.sleep(2)
             
             result = {
@@ -145,19 +163,19 @@ def process_video_generation(self: Task, job_id: str) -> Dict[str, Any]:
                 job_id=job_id,
                 status="completed",
                 result=result,
-                used_provider="mock_provider",
-                used_model="mock_model",
+                used_provider=provider_name,
+                used_model=model_name,
                 generation_time_ms=duration_ms
             )
             
             record_job_completion("completed")
             record_job_processing_time(
                 duration_seconds=(time.time() - start_time),
-                provider="mock_provider",
-                model="mock_model"
+                provider=provider_name,
+                model=model_name
             )
             
-            logger.info("Job completed", job_id=job_id, duration_ms=duration_ms)
+            logger.info("Job completed", job_id=job_id, duration_ms=duration_ms, provider=provider_name)
             
             return result
         

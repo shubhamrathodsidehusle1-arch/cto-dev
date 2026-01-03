@@ -40,7 +40,12 @@ async def test_provider(test_request: ProviderTestRequest) -> ProviderHealthResp
     
     logger.info("Testing provider", provider=test_request.provider)
     
+    # Get existing metadata if any
+    existing_health = await db.providerhealth.find_unique(where={"provider": test_request.provider})
+    metadata = existing_health.metadata if existing_health else None
+    
     try:
+        # Mock test logic
         status = "healthy"
         error_message = None
         response_time_ms = 100
@@ -55,7 +60,8 @@ async def test_provider(test_request: ProviderTestRequest) -> ProviderHealthResp
         provider=test_request.provider,
         status=status,
         error_message=error_message,
-        response_time_ms=response_time_ms
+        response_time_ms=response_time_ms,
+        metadata=metadata
     )
     
     return ProviderHealthResponse.model_validate(health)
