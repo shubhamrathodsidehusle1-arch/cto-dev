@@ -87,3 +87,12 @@ celerybeat.pid
 # Backend specific
 backend/.env
 backend/*.log
+
+# Frontend
+frontend/.next/
+frontend/node_modules/
+frontend/.env.local
+frontend/.env.*.local
+frontend/out/
+frontend/build/
+frontend/.vercel
