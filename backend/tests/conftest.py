@@ -40,6 +40,14 @@ async def db():
     """
     prisma = await get_prisma()
     yield prisma
+    
+    # Cleanup: Delete all test data after each test
+    try:
+        await prisma.job.delete_many()
+        await prisma.providerhealth.delete_many()
+        await prisma.metric.delete_many()
+    except Exception as e:
+        print(f"Cleanup error: {e}")
 
 
 @pytest.fixture(scope="function")
