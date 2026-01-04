@@ -3,6 +3,7 @@ from typing import Any, Dict, List, Optional
 from datetime import datetime
 
 from prisma.models import Job, ProviderHealth, Metric
+from prisma import Json
 
 from app.utils.errors import DatabaseError
 from app.utils.logger import get_logger
@@ -54,15 +55,17 @@ async def create_job(
         if max_retries is None:
             max_retries = await get_system_metadata(db, "default_max_retries") or 3
             
-        job = await db.job.create(
-            data={
-                "userId": user_id,
-                "prompt": prompt,
-                "metadata": metadata or {},
-                "maxRetries": max_retries,
-                "status": "queued"
-            }
-        )
+        job_data = {
+            "userId": user_id,
+            "prompt": prompt,
+            "maxRetries": max_retries,
+            "status": "queued"
+        }
+        
+        if metadata is not None:
+            job_data["metadata"] = Json(metadata)
+            
+        job = await db.job.create(data=job_data)
         logger.info("Job created", job_id=job.id, user_id=user_id)
         return job
     except Exception as e:
