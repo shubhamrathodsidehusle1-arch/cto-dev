@@ -13,7 +13,7 @@ router = APIRouter(tags=["health"])
 @router.get("/health")
 async def liveness_probe() -> Dict[str, str]:
     """Liveness probe for container orchestration.
-    
+
     Returns:
         Liveness status
     """
@@ -23,7 +23,7 @@ async def liveness_probe() -> Dict[str, str]:
 @router.get("/health/ready")
 async def readiness_probe() -> Dict[str, Any]:
     """Readiness probe for container orchestration.
-    
+
     Returns:
         Readiness status with component health
     """
@@ -34,7 +34,7 @@ async def readiness_probe() -> Dict[str, Any]:
 @router.get("/metrics")
 async def metrics_endpoint() -> Response:
     """Prometheus metrics endpoint.
-    
+
     Returns:
         Prometheus metrics in text format
     """

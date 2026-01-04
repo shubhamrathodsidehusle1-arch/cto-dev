@@ -9,6 +9,7 @@ logger = get_logger(__name__)
 
 METADATA_FILE = os.path.join(os.path.dirname(__file__), "metadata.json")
 
+
 async def load_metadata() -> None:
     """Load metadata from JSON file into the database."""
     if not os.path.exists(METADATA_FILE):
@@ -18,9 +19,9 @@ async def load_metadata() -> None:
     try:
         with open(METADATA_FILE, "r") as f:
             metadata = json.load(f)
-        
+
         db = await get_prisma()
-        
+
         # Load provider metadata
         providers = metadata.get("providers", [])
         for p_data in providers:
@@ -32,16 +33,16 @@ async def load_metadata() -> None:
                         "provider": provider_name,
                         "status": p_data.get("status", "unknown"),
                         "costPerRequest": p_data.get("costPerRequest"),
-                        "metadata": p_data.get("metadata", {})
+                        "metadata": p_data.get("metadata", {}),
                     },
                     "update": {
                         "costPerRequest": p_data.get("costPerRequest"),
-                        "metadata": p_data.get("metadata", {})
-                    }
-                }
+                        "metadata": p_data.get("metadata", {}),
+                    },
+                },
             )
             logger.info("Loaded provider metadata", provider=provider_name)
-            
+
         # Load system metadata
         system_config = metadata.get("system_config", [])
         for config in system_config:
@@ -52,16 +53,16 @@ async def load_metadata() -> None:
                     "create": {
                         "key": key,
                         "value": config.get("value"),
-                        "description": config.get("description")
+                        "description": config.get("description"),
                     },
                     "update": {
                         "value": config.get("value"),
-                        "description": config.get("description")
-                    }
-                }
+                        "description": config.get("description"),
+                    },
+                },
             )
             logger.info("Loaded system metadata", key=key)
-            
+
         logger.info("Metadata loading complete")
     except Exception as e:
         logger.error("Failed to load metadata", error=str(e))

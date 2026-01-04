@@ -14,7 +14,7 @@ router = APIRouter(prefix="/metadata", tags=["metadata"])
 @router.get("", response_model=SystemMetadataListResponse)
 async def get_all_metadata() -> SystemMetadataListResponse:
     """Get all system metadata.
-    
+
     Returns:
         List of all system metadata
     """
@@ -28,20 +28,22 @@ async def get_all_metadata() -> SystemMetadataListResponse:
 @router.get("/{key}", response_model=SystemMetadataResponse)
 async def get_metadata_by_key(key: str) -> SystemMetadataResponse:
     """Get system metadata by key.
-    
+
     Args:
         key: Metadata key
-        
+
     Returns:
         System metadata details
-        
+
     Raises:
         HTTPException: If metadata not found
     """
     db = await get_prisma()
     metadata = await db.systemmetadata.find_unique(where={"key": key})
-    
+
     if not metadata:
-        raise HTTPException(status_code=404, detail=f"Metadata with key '{key}' not found")
-        
+        raise HTTPException(
+            status_code=404, detail=f"Metadata with key '{key}' not found"
+        )
+
     return SystemMetadataResponse.model_validate(metadata)

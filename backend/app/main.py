@@ -19,24 +19,26 @@ logger = get_logger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator:
     """Application lifespan handler.
-    
+
     Args:
         app: FastAPI application
-        
+
     Yields:
         None
     """
-    logger.info("Starting application", app_name=settings.APP_NAME, env=settings.APP_ENV)
-    
+    logger.info(
+        "Starting application", app_name=settings.APP_NAME, env=settings.APP_ENV
+    )
+
     await get_prisma()
     logger.info("Database connected")
-    
+
     # Load metadata
     await load_metadata()
     logger.info("Metadata loaded")
-    
+
     yield
-    
+
     await disconnect_prisma()
     logger.info("Application shutdown complete")
 
@@ -45,7 +47,7 @@ app = FastAPI(
     title="AI Video Generation Backend",
     description="Production-ready backend for AI video generation platform",
     version="0.1.0",
-    lifespan=lifespan
+    lifespan=lifespan,
 )
 
 app.state.config = settings
@@ -70,7 +72,7 @@ app.include_router(metadata.router, prefix=f"/api/{settings.API_VERSION}")
 @app.get("/")
 async def root():
     """Root endpoint.
-    
+
     Returns:
         Welcome message
     """
@@ -78,17 +80,17 @@ async def root():
         "name": settings.APP_NAME,
         "version": "0.1.0",
         "status": "running",
-        "env": settings.APP_ENV
+        "env": settings.APP_ENV,
     }
 
 
 if __name__ == "__main__":
     import uvicorn
-    
+
     uvicorn.run(
         "app.main:app",
         host=settings.API_HOST,
         port=settings.API_PORT,
         reload=settings.APP_DEBUG,
-        log_level=settings.LOG_LEVEL.lower()
+        log_level=settings.LOG_LEVEL.lower(),
     )

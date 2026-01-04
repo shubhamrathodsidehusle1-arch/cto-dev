@@ -12,7 +12,7 @@ logger = get_logger(__name__)
 
 async def check_database_health() -> Dict[str, Any]:
     """Check database health.
-    
+
     Returns:
         Health status dict
     """
@@ -27,7 +27,7 @@ async def check_database_health() -> Dict[str, Any]:
 
 async def check_redis_health() -> Dict[str, Any]:
     """Check Redis health.
-    
+
     Returns:
         Health status dict
     """
@@ -45,22 +45,18 @@ async def check_redis_health() -> Dict[str, Any]:
 
 async def get_system_health() -> Dict[str, Any]:
     """Get overall system health.
-    
+
     Returns:
         System health status
     """
     database_health = await check_database_health()
     redis_health = await check_redis_health()
-    
+
     is_healthy = (
-        database_health["status"] == "healthy" and
-        redis_health["status"] == "healthy"
+        database_health["status"] == "healthy" and redis_health["status"] == "healthy"
     )
-    
+
     return {
         "status": "healthy" if is_healthy else "unhealthy",
-        "components": {
-            "database": database_health,
-            "redis": redis_health
-        }
+        "components": {"database": database_health, "redis": redis_health},
     }

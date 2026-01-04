@@ -6,14 +6,22 @@ from pydantic import BaseModel, Field
 
 class JobCreate(BaseModel):
     """Job creation request."""
+
     userId: str = Field(..., description="User ID")
-    prompt: str = Field(..., min_length=1, max_length=5000, description="Video generation prompt")
-    metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
-    maxRetries: Optional[int] = Field(default=None, ge=0, le=10, description="Maximum retry attempts")
+    prompt: str = Field(
+        ..., min_length=1, max_length=5000, description="Video generation prompt"
+    )
+    metadata: Optional[Dict[str, Any]] = Field(
+        default=None, description="Additional metadata"
+    )
+    maxRetries: Optional[int] = Field(
+        default=None, ge=0, le=10, description="Maximum retry attempts"
+    )
 
 
 class JobResponse(BaseModel):
     """Job response model."""
+
     id: str
     userId: str
     status: str
@@ -31,14 +39,16 @@ class JobResponse(BaseModel):
     errorMessage: Optional[str]
     createdAt: datetime
     updatedAt: datetime
-    
+
     class Config:
         """Pydantic config."""
+
         from_attributes = True
 
 
 class JobListResponse(BaseModel):
     """Job list response."""
+
     jobs: list[JobResponse]
     total: int
     skip: int
@@ -47,6 +57,7 @@ class JobListResponse(BaseModel):
 
 class JobStatusUpdate(BaseModel):
     """Job status update request."""
+
     status: str = Field(..., pattern="^(queued|processing|completed|failed|cancelled)$")
     errorMessage: Optional[str] = None
     result: Optional[Dict[str, Any]] = None
@@ -54,6 +65,7 @@ class JobStatusUpdate(BaseModel):
 
 class JobStatsResponse(BaseModel):
     """Job statistics response."""
+
     total: int
     by_status: Dict[str, int]
     success_rate: float
