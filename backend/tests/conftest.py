@@ -11,7 +11,7 @@ from app.db.prisma import get_prisma, disconnect_prisma
 @pytest.fixture(scope="session")
 def event_loop() -> Generator:
     """Create an event loop for the test session.
-    
+
     Yields:
         Event loop
     """
@@ -23,7 +23,7 @@ def event_loop() -> Generator:
 @pytest.fixture(scope="function")
 async def client() -> AsyncGenerator[AsyncClient, None]:
     """Create an async HTTP client for testing.
-    
+
     Yields:
         AsyncClient instance
     """
@@ -34,7 +34,7 @@ async def client() -> AsyncGenerator[AsyncClient, None]:
 @pytest.fixture(scope="function")
 async def db():
     """Create a database connection for testing.
-    
+
     Yields:
         Prisma client
     """
@@ -45,7 +45,7 @@ async def db():
 @pytest.fixture(scope="function")
 async def sample_job_data():
     """Sample job data for testing.
-    
+
     Returns:
         Job creation data
     """
@@ -53,5 +53,5 @@ async def sample_job_data():
         "userId": "test-user-123",
         "prompt": "Create a video of a sunset over the ocean",
         "metadata": {"priority": "high", "tags": ["nature", "sunset"]},
-        "maxRetries": 3
+        "maxRetries": 3,
     }
