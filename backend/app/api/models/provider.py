@@ -1,6 +1,8 @@
 """Provider API models."""
-from typing import Optional
+
 from datetime import datetime
+from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
 
@@ -24,5 +26,23 @@ class ProviderHealthResponse(BaseModel):
 
 class ProviderTestRequest(BaseModel):
     """Provider test request."""
+
     provider: str = Field(..., description="Provider name to test")
     timeout: int = Field(default=30, ge=1, le=300, description="Timeout in seconds")
+
+
+class ProviderModelResponse(BaseModel):
+    """Provider model response."""
+
+    id: str
+    name: str
+    modes: List[str]
+    max_duration_seconds: Optional[int] = None
+    max_resolution: Optional[str] = None
+
+
+class ProviderInfoResponse(BaseModel):
+    """Provider information response."""
+
+    id: str
+    name: str

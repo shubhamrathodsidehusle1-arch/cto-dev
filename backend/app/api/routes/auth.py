@@ -1,33 +1,31 @@
 """Authentication API routes."""
-from datetime import timedelta
-from fastapi import APIRouter, Depends, HTTPException, status
 
+from fastapi import APIRouter, Depends
+from prisma.models import User
+
+from app.api.dependencies import get_current_user
 from app.api.models.auth import (
-    UserRegister,
-    UserLogin,
     TokenRefresh,
     TokenResponse,
-    UserResponse
+    UserLogin,
+    UserRegister,
+    UserResponse,
 )
-from app.api.dependencies import get_current_user
 from app.db.prisma import get_prisma
-from app.db.models import create_job, update_job_status
 from app.utils.auth import (
-    verify_password,
-    get_password_hash,
     create_access_token,
     create_refresh_token,
-    decode_token
+    decode_token,
+    get_password_hash,
+    verify_password,
 )
 from app.utils.errors import (
-    DuplicateEmailError,
     AuthenticationError,
+    DatabaseError,
+    DuplicateEmailError,
     InvalidTokenError,
-    DatabaseError
 )
-from app.config import settings
 from app.utils.logger import get_logger
-from prisma.models import User
 
 logger = get_logger(__name__)
 

@@ -1,11 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
-import { ProviderHealth } from '@/types';
 import { Activity, Shield, ShieldAlert, ShieldCheck, RefreshCcw, Zap } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+
+import { ProviderHealth, providersApi } from '@/services/api';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -20,7 +20,7 @@ export default function ProvidersPage() {
   const fetchProviders = async () => {
     try {
       setLoading(true);
-      const data = await api.providers.status();
+      const data = await providersApi.status();
       setProviders(data);
       setError(null);
     } catch (err) {
@@ -33,7 +33,7 @@ export default function ProvidersPage() {
   const testProvider = async (providerName: string) => {
     try {
       setTesting(providerName);
-      await api.providers.test(providerName);
+      await providersApi.test(providerName);
       await fetchProviders();
     } catch (err) {
       alert(err instanceof Error ? err.message : 'Test failed');
@@ -119,7 +119,7 @@ export default function ProvidersPage() {
                         </span>
                         <span className="text-sm text-gray-500 flex items-center">
                           <Zap className="mr-1 h-3 w-3" />
-                          {provider.avgResponseTimeMs.toFixed(0)}ms avg
+                          {(provider.avgResponseTimeMs ?? 0).toFixed(0)}ms avg
                         </span>
                         <span className="text-sm text-gray-500">
                           Last check: {new Date(provider.lastCheckedAt).toLocaleTimeString()}

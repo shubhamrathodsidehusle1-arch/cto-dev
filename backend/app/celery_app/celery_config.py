@@ -44,9 +44,11 @@ celery_app.conf.update(
     task_default_routing_key="default",
     
     task_routes={
-        "app.celery_app.tasks.process_video_generation": {
-            "queue": settings.DEFAULT_QUEUE_NAME
-        }
+        "app.celery_app.tasks.process_video_generation": {"queue": settings.DEFAULT_QUEUE_NAME},
+        "app.celery_app.tasks.generate_video": {"queue": settings.DEFAULT_QUEUE_NAME},
+        "app.celery_app.tasks.poll_provider_status": {"queue": settings.LOW_PRIORITY_QUEUE_NAME},
+        "app.celery_app.tasks.download_video": {"queue": settings.LOW_PRIORITY_QUEUE_NAME},
+        "app.celery_app.tasks.cleanup_expired_videos": {"queue": settings.LOW_PRIORITY_QUEUE_NAME},
     },
     
     task_time_limit=settings.CELERY_TASK_TIME_LIMIT,

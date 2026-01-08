@@ -1,23 +1,22 @@
 """Job API routes."""
-from typing import Optional, Dict, Any
-from fastapi import APIRouter, Query, HTTPException, Depends, status
+
+from typing import Any, Dict, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import FileResponse
 from prisma.models import User
 
-from app.api.models.job import JobCreate, JobResponse, JobListResponse, JobStatsResponse
-from app.api.dependencies import get_current_user
-from app.db.prisma import get_prisma
-from app.db.models import (
-    create_job,
-    get_job,
-    list_jobs,
-    delete_job,
-    update_job_status,
-    get_job_stats
-)
+from app.api.dependencies import get_current_user, get_optional_user
+from app.api.models.job import JobCreate, JobListResponse, JobResponse, JobStatsResponse
+from app.config import settings
 from app.celery_app.celery_config import celery_app
 from app.celery_app.tasks import process_video_generation
-from app.utils.errors import JobNotFoundError, DatabaseError
+from app.db.models import create_job, delete_job, get_job, get_job_stats, update_job_status
+from app.db.prisma import get_prisma
+from app.storage.service import get_storage
+from app.utils.errors import JobNotFoundError, RateLimitError
 from app.utils.logger import get_logger
+from app.utils.rate_limit import check_rate_limit
 
 logger = get_logger(__name__)
 
@@ -38,8 +37,18 @@ async def create_job_endpoint(
     Returns:
         Created job
     """
+    # Per-user rate limiting (best-effort)
+    try:
+        check_rate_limit(
+            key=f"rl:user:{current_user.id}:jobs:create",
+            limit=settings.USER_JOB_CREATE_RATE_LIMIT_PER_MINUTE,
+            window_seconds=60,
+        )
+    except ValueError:
+        raise RateLimitError()
+
     db = await get_prisma()
-    
+
     # Build metadata with video generation parameters
     metadata = job_data.metadata or {}
     if job_data.model:
@@ -70,8 +79,8 @@ async def create_job_endpoint(
         celery_task_id=task.id
     )
     
-    logger.info("Job created and queued", job_id=job.id, user_id=job_data.userId, task_id=task.id)
-    
+    logger.info("Job created and queued", job_id=job.id, user_id=current_user.id, task_id=task.id)
+
     return JobResponse.model_validate(job)
 
 
@@ -114,6 +123,63 @@ async def get_job_endpoint(
         )
     
     return JobResponse.model_validate(job)
+
+
+@router.get("/{job_id}/video")
+async def get_job_video_endpoint(
+    job_id: str,
+    token: Optional[str] = Query(None, description="Optional download token"),
+    current_user: Optional[User] = Depends(get_optional_user),
+) -> FileResponse:
+    """Download the generated video for a completed job.
+
+    The endpoint supports two auth strategies:
+    - Authenticated access via bearer token (recommended)
+    - Tokenized access via `?token=...` for embedding in the frontend video tag
+
+    Args:
+        job_id: Job ID.
+        token: Optional download token.
+        current_user: Optional authenticated user.
+
+    Returns:
+        FileResponse streaming the stored video.
+    """
+
+    db = await get_prisma()
+    job = await get_job(db=db, job_id=job_id)
+
+    if not job:
+        raise JobNotFoundError(job_id=job_id)
+
+    result = job.result or {}
+    storage_path = result.get("storagePath")
+    expected_token = result.get("downloadToken")
+
+    if job.status != "completed" or not storage_path:
+        raise HTTPException(status_code=404, detail="Video not available")
+
+    if current_user is not None:
+        if job.userId != current_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You don't have access to this video",
+            )
+    else:
+        if not token or token != expected_token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Unauthorized",
+            )
+
+    storage = get_storage()
+    abs_path = storage.get_absolute_path(storage_path)
+
+    return FileResponse(
+        abs_path,
+        media_type="video/mp4",
+        filename=f"{job_id}.mp4",
+    )
 
 
 @router.get("", response_model=JobListResponse)

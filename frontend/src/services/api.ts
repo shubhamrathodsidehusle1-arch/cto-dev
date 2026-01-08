@@ -45,7 +45,16 @@ class ApiClient {
       throw new Error(error.error || error.message || 'Request failed');
     }
 
-    return response.json();
+    if (response.status === 204) {
+      return null;
+    }
+
+    const text = await response.text();
+    if (!text) {
+      return null;
+    }
+
+    return JSON.parse(text);
   }
 
   async get<T>(path: string): Promise<T> {
@@ -170,6 +179,55 @@ export interface JobStatsResponse {
   success_rate: number;
   avg_generation_time_ms: number | null;
 }
+
+export interface ProviderHealth {
+  id: string;
+  provider: string;
+  status: 'healthy' | 'degraded' | 'unhealthy' | 'unknown';
+  lastCheckedAt: string;
+  lastErrorMessage: string | null;
+  consecutiveFailures: number;
+  avgResponseTimeMs: number | null;
+  costPerRequest: number | null;
+  metadata: any;
+  updatedAt: string;
+}
+
+export interface ProviderInfo {
+  id: string;
+  name: string;
+}
+
+export interface ProviderModel {
+  id: string;
+  name: string;
+  modes: string[];
+  max_duration_seconds: number | null;
+  max_resolution: string | null;
+}
+
+// Providers API
+export const providersApi = {
+  list: async (): Promise<ProviderInfo[]> => {
+    return apiClient.get<ProviderInfo[]>('/providers');
+  },
+
+  status: async (): Promise<ProviderHealth[]> => {
+    return apiClient.get<ProviderHealth[]>('/providers/status');
+  },
+
+  health: async (providerId: string): Promise<ProviderHealth> => {
+    return apiClient.get<ProviderHealth>(`/providers/${providerId}/health`);
+  },
+
+  models: async (providerId: string): Promise<ProviderModel[]> => {
+    return apiClient.get<ProviderModel[]>(`/providers/${providerId}/models`);
+  },
+
+  test: async (provider: string, timeout = 30): Promise<ProviderHealth> => {
+    return apiClient.post<ProviderHealth>('/providers/test', { provider, timeout });
+  },
+};
 
 // Auth API
 export const authApi = {
