@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     # Security
     SECRET_KEY: str = "development-secret-key-change-in-production"
     API_KEY: str = "development-api-key-change-in-production"
+    JWT_SECRET_KEY: str = "development-jwt-secret-key-change-in-production"
+    JWT_ALGORITHM: str = "HS256"
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    PASSWORD_HASH_ROUNDS: int = 12
     
     # CORS
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]

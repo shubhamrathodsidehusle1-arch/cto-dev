@@ -85,3 +85,78 @@ class DatabaseError(APIError):
             message=f"Database error: {message}",
             status_code=500
         )
+
+
+class AuthenticationError(APIError):
+    """Authentication error."""
+    
+    def __init__(self, message: str = "Authentication failed"):
+        """Initialize authentication error.
+        
+        Args:
+            message: Error message
+        """
+        super().__init__(
+            message=message,
+            status_code=401
+        )
+
+
+class AuthorizationError(APIError):
+    """Authorization error."""
+    
+    def __init__(self, message: str = "Insufficient permissions"):
+        """Initialize authorization error.
+        
+        Args:
+            message: Error message
+        """
+        super().__init__(
+            message=message,
+            status_code=403
+        )
+
+
+class UserNotFoundError(APIError):
+    """User not found error."""
+    
+    def __init__(self, user_id: str):
+        """Initialize user not found error.
+        
+        Args:
+            user_id: User ID that was not found
+        """
+        super().__init__(
+            message=f"User {user_id} not found",
+            status_code=404
+        )
+
+
+class InvalidTokenError(APIError):
+    """Invalid token error."""
+    
+    def __init__(self, message: str = "Invalid or expired token"):
+        """Initialize invalid token error.
+        
+        Args:
+            message: Error message
+        """
+        super().__init__(
+            message=message,
+            status_code=401
+        )
+
+
+class DuplicateEmailError(APIError):
+    """Duplicate email error."""
+    
+    def __init__(self, email: str):
+        """Initialize duplicate email error.
+        
+        Args:
+            email: Email address that already exists
+        """
+        super().__init__(
+            message=f"User with email {email} already exists",
+            status_code=409
+        )
