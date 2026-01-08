@@ -1,8 +1,10 @@
 """Job API routes."""
-from typing import Optional
-from fastapi import APIRouter, Query, HTTPException
+from typing import Optional, Dict, Any
+from fastapi import APIRouter, Query, HTTPException, Depends, status
+from prisma.models import User
 
 from app.api.models.job import JobCreate, JobResponse, JobListResponse, JobStatsResponse
+from app.api.dependencies import get_current_user
 from app.db.prisma import get_prisma
 from app.db.models import (
     create_job,
@@ -14,7 +16,7 @@ from app.db.models import (
 )
 from app.celery_app.celery_config import celery_app
 from app.celery_app.tasks import process_video_generation
-from app.utils.errors import JobNotFoundError
+from app.utils.errors import JobNotFoundError, DatabaseError
 from app.utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -23,22 +25,38 @@ router = APIRouter(prefix="/jobs", tags=["jobs"])
 
 
 @router.post("", response_model=JobResponse, status_code=201)
-async def create_job_endpoint(job_data: JobCreate) -> JobResponse:
+async def create_job_endpoint(
+    job_data: JobCreate,
+    current_user: User = Depends(get_current_user)
+) -> JobResponse:
     """Create a new video generation job.
     
     Args:
         job_data: Job creation data
+        current_user: Current authenticated user
         
     Returns:
         Created job
     """
     db = await get_prisma()
     
+    # Build metadata with video generation parameters
+    metadata = job_data.metadata or {}
+    if job_data.model:
+        metadata["model"] = job_data.model
+    if job_data.resolution:
+        metadata["resolution"] = job_data.resolution
+    if job_data.quality:
+        metadata["quality"] = job_data.quality
+    if job_data.duration:
+        metadata["duration"] = job_data.duration
+    
     job = await create_job(
         db=db,
-        user_id=job_data.userId,
+        user_id=current_user.id,
         prompt=job_data.prompt,
-        metadata=job_data.metadata,
+        project_id=job_data.projectId,
+        metadata=metadata,
         max_retries=job_data.maxRetries
     )
     
@@ -58,17 +76,22 @@ async def create_job_endpoint(job_data: JobCreate) -> JobResponse:
 
 
 @router.get("/{job_id}", response_model=JobResponse)
-async def get_job_endpoint(job_id: str) -> JobResponse:
+async def get_job_endpoint(
+    job_id: str,
+    current_user: User = Depends(get_current_user)
+) -> JobResponse:
     """Get job by ID.
     
     Args:
         job_id: Job ID
+        current_user: Current authenticated user
         
     Returns:
         Job details
         
     Raises:
         JobNotFoundError: If job not found
+        HTTPException: If user doesn't own the job
     """
     db = await get_prisma()
     
@@ -77,43 +100,59 @@ async def get_job_endpoint(job_id: str) -> JobResponse:
     if not job:
         raise JobNotFoundError(job_id=job_id)
     
+    # Verify user owns the job
+    if job.userId != current_user.id:
+        logger.warning(
+            "Unauthorized job access attempt",
+            job_id=job_id,
+            user_id=current_user.id,
+            owner_id=job.userId
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this job"
+        )
+    
     return JobResponse.model_validate(job)
 
 
 @router.get("", response_model=JobListResponse)
 async def list_jobs_endpoint(
-    userId: Optional[str] = Query(None, description="Filter by user ID"),
     status: Optional[str] = Query(None, description="Filter by status"),
+    projectId: Optional[str] = Query(None, description="Filter by project ID"),
     skip: int = Query(0, ge=0, description="Number of records to skip"),
-    take: int = Query(50, ge=1, le=100, description="Number of records to return")
+    take: int = Query(50, ge=1, le=100, description="Number of records to return"),
+    current_user: User = Depends(get_current_user)
 ) -> JobListResponse:
-    """List jobs with filters and pagination.
+    """List current user's jobs with filters and pagination.
     
     Args:
-        userId: Filter by user ID
         status: Filter by status
+        projectId: Filter by project ID
         skip: Number of records to skip
         take: Number of records to return
+        current_user: Current authenticated user
         
     Returns:
         Paginated job list
     """
     db = await get_prisma()
     
-    jobs = await list_jobs(
-        db=db,
-        user_id=userId,
-        status=status,
+    # Build where clause
+    where: Dict[str, Any] = {"userId": current_user.id}
+    if status:
+        where["status"] = status
+    if projectId:
+        where["projectId"] = projectId
+    
+    jobs = await db.job.find_many(
+        where=where,
         skip=skip,
-        take=take
+        take=take,
+        order={"createdAt": "desc"}
     )
     
-    total = await db.job.count(
-        where={
-            **({"userId": userId} if userId else {}),
-            **({"status": status} if status else {})
-        }
-    )
+    total = await db.job.count(where=where)
     
     return JobListResponse(
         jobs=[JobResponse.model_validate(job) for job in jobs],
@@ -124,14 +163,19 @@ async def list_jobs_endpoint(
 
 
 @router.delete("/{job_id}", status_code=204)
-async def delete_job_endpoint(job_id: str) -> None:
+async def delete_job_endpoint(
+    job_id: str,
+    current_user: User = Depends(get_current_user)
+) -> None:
     """Delete/cancel a job.
     
     Args:
         job_id: Job ID
+        current_user: Current authenticated user
         
     Raises:
         JobNotFoundError: If job not found
+        HTTPException: If user doesn't own the job
     """
     db = await get_prisma()
     
@@ -139,6 +183,18 @@ async def delete_job_endpoint(job_id: str) -> None:
     
     if not job:
         raise JobNotFoundError(job_id=job_id)
+    
+    # Verify user owns the job
+    if job.userId != current_user.id:
+        logger.warning(
+            "Unauthorized job deletion attempt",
+            job_id=job_id,
+            user_id=current_user.id
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this job"
+        )
     
     # Revoke Celery task if ID exists
     if job.celeryTaskId:
@@ -147,22 +203,26 @@ async def delete_job_endpoint(job_id: str) -> None:
     
     await delete_job(db=db, job_id=job_id)
     
-    logger.info("Job deleted", job_id=job_id)
+    logger.info("Job deleted", job_id=job_id, user_id=current_user.id)
 
 
 @router.post("/{job_id}/cancel", response_model=JobResponse)
-async def cancel_job_endpoint(job_id: str) -> JobResponse:
+async def cancel_job_endpoint(
+    job_id: str,
+    current_user: User = Depends(get_current_user)
+) -> JobResponse:
     """Cancel a running or queued job.
     
     Args:
         job_id: Job ID
+        current_user: Current authenticated user
         
     Returns:
         Updated job details
         
     Raises:
         JobNotFoundError: If job not found
-        HTTPException: If job cannot be cancelled
+        HTTPException: If job cannot be cancelled or user doesn't own it
     """
     db = await get_prisma()
     
@@ -170,6 +230,18 @@ async def cancel_job_endpoint(job_id: str) -> JobResponse:
     
     if not job:
         raise JobNotFoundError(job_id=job_id)
+    
+    # Verify user owns the job
+    if job.userId != current_user.id:
+        logger.warning(
+            "Unauthorized job cancel attempt",
+            job_id=job_id,
+            user_id=current_user.id
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this job"
+        )
     
     if job.status in ["completed", "failed", "cancelled"]:
         raise HTTPException(
@@ -190,22 +262,28 @@ async def cancel_job_endpoint(job_id: str) -> JobResponse:
         error_message="Job cancelled by user"
     )
     
+    logger.info("Job cancelled", job_id=job_id, user_id=current_user.id)
+    
     return JobResponse.model_validate(job)
 
 
 @router.post("/{job_id}/retry", response_model=JobResponse)
-async def retry_job_endpoint(job_id: str) -> JobResponse:
+async def retry_job_endpoint(
+    job_id: str,
+    current_user: User = Depends(get_current_user)
+) -> JobResponse:
     """Retry a failed or cancelled job.
     
     Args:
         job_id: Job ID
+        current_user: Current authenticated user
         
     Returns:
         Updated job details
         
     Raises:
         JobNotFoundError: If job not found
-        HTTPException: If job cannot be retried
+        HTTPException: If job cannot be retried or user doesn't own it
     """
     db = await get_prisma()
     
@@ -213,6 +291,18 @@ async def retry_job_endpoint(job_id: str) -> JobResponse:
     
     if not job:
         raise JobNotFoundError(job_id=job_id)
+    
+    # Verify user owns the job
+    if job.userId != current_user.id:
+        logger.warning(
+            "Unauthorized job retry attempt",
+            job_id=job_id,
+            user_id=current_user.id
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You don't have access to this job"
+        )
     
     if job.status not in ["failed", "cancelled"]:
         raise HTTPException(
@@ -239,25 +329,25 @@ async def retry_job_endpoint(job_id: str) -> JobResponse:
         celery_task_id=task.id
     )
     
-    logger.info("Job retried", job_id=job_id, task_id=task.id)
+    logger.info("Job retried", job_id=job_id, user_id=current_user.id, task_id=task.id)
     
     return JobResponse.model_validate(job)
 
 
 @router.get("/stats/summary", response_model=JobStatsResponse)
 async def get_jobs_stats_endpoint(
-    userId: Optional[str] = Query(None, description="Filter by user ID")
+    current_user: User = Depends(get_current_user)
 ) -> JobStatsResponse:
-    """Get job statistics summary.
+    """Get current user's job statistics summary.
     
     Args:
-        userId: Filter by user ID
+        current_user: Current authenticated user
         
     Returns:
         Job statistics summary
     """
     db = await get_prisma()
     
-    stats = await get_job_stats(db=db, user_id=userId)
+    stats = await get_job_stats(db=db, user_id=current_user.id)
     
     return JobStatsResponse(**stats)

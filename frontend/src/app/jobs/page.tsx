@@ -1,13 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { api } from '@/lib/api';
-import { Job } from '@/types';
+import { useRouter } from 'next/navigation';
+import { useAuth } from '@/app/providers/auth-provider';
+import { jobsApi, Job } from '@/services/api';
 import JobCard from '@/components/JobCard';
 import { RefreshCcw, Plus } from 'lucide-react';
 import Link from 'next/link';
 
 export default function JobsPage() {
+  const router = useRouter();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -15,8 +18,8 @@ export default function JobsPage() {
   const fetchJobs = async () => {
     try {
       setLoading(true);
-      const data = await api.jobs.list();
-      setJobs(data);
+      const data = await jobsApi.list();
+      setJobs(data.jobs);
       setError(null);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch jobs');
@@ -26,17 +29,34 @@ export default function JobsPage() {
   };
 
   useEffect(() => {
-    fetchJobs();
-    // Poll for updates if there are processing jobs
-    const interval = setInterval(() => {
-      const hasProcessing = jobs.some(j => j.status === 'processing' || j.status === 'queued');
-      if (hasProcessing) {
-        fetchJobs();
-      }
-    }, 5000);
+    if (isAuthenticated) {
+      fetchJobs();
+    } else if (!authLoading) {
+      router.push('/login');
+    }
+  }, [isAuthenticated, authLoading, router]);
 
-    return () => clearInterval(interval);
-  }, [jobs.length]);
+  useEffect(() => {
+    if (isAuthenticated && jobs.length > 0) {
+      // Poll for updates if there are processing jobs
+      const interval = setInterval(() => {
+        const hasProcessing = jobs.some(j => j.status === 'processing' || j.status === 'queued');
+        if (hasProcessing) {
+          fetchJobs();
+        }
+      }, 5000);
+
+      return () => clearInterval(interval);
+    }
+  }, [jobs, isAuthenticated]);
+
+  if (authLoading || (loading && jobs.length === 0)) {
+    return (
+      <div className="flex justify-center py-12">
+        <RefreshCcw className="h-8 w-8 text-blue-500 animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -73,11 +93,7 @@ export default function JobsPage() {
         </div>
       )}
 
-      {loading && jobs.length === 0 ? (
-        <div className="flex justify-center py-12">
-          <RefreshCcw className="h-8 w-8 text-blue-500 animate-spin" />
-        </div>
-      ) : jobs.length === 0 ? (
+      {jobs.length === 0 ? (
         <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed border-gray-300">
           <p className="text-gray-500">No jobs found. Start by creating a new one!</p>
           <Link
@@ -90,7 +106,7 @@ export default function JobsPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {jobs.map((job) => (
-            <JobCard key={job.id} job={job} />
+            <JobCard key={job.id} job={job} onUpdate={fetchJobs} />
           ))}
         </div>
       )}

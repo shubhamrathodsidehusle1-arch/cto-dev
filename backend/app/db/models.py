@@ -2,7 +2,7 @@
 from typing import Any, Dict, List, Optional
 from datetime import datetime
 
-from prisma.models import Job, ProviderHealth, Metric
+from prisma.models import Job, ProviderHealth, Metric, User, Project
 
 from app.utils.errors import DatabaseError
 from app.utils.logger import get_logger
@@ -32,6 +32,7 @@ async def create_job(
     db: Any,
     user_id: str,
     prompt: str,
+    project_id: Optional[str] = None,
     metadata: Optional[Dict[str, Any]] = None,
     max_retries: Optional[int] = None
 ) -> Job:
@@ -41,6 +42,7 @@ async def create_job(
         db: Prisma client
         user_id: User ID
         prompt: Video generation prompt
+        project_id: Project ID (optional)
         metadata: Additional metadata
         max_retries: Maximum retry attempts (overrides system default)
         
@@ -54,16 +56,19 @@ async def create_job(
         if max_retries is None:
             max_retries = await get_system_metadata(db, "default_max_retries") or 3
             
-        job = await db.job.create(
-            data={
-                "userId": user_id,
-                "prompt": prompt,
-                "metadata": metadata or {},
-                "maxRetries": max_retries,
-                "status": "queued"
-            }
-        )
-        logger.info("Job created", job_id=job.id, user_id=user_id)
+        job_data: Dict[str, Any] = {
+            "userId": user_id,
+            "prompt": prompt,
+            "metadata": metadata or {},
+            "maxRetries": max_retries,
+            "status": "queued"
+        }
+        
+        if project_id:
+            job_data["projectId"] = project_id
+            
+        job = await db.job.create(data=job_data)
+        logger.info("Job created", job_id=job.id, user_id=user_id, project_id=project_id)
         return job
     except Exception as e:
         logger.error("Failed to create job", error=str(e))
@@ -369,3 +374,87 @@ async def create_metric(
     except Exception as e:
         logger.error("Failed to create metric", error=str(e))
         raise DatabaseError(f"Failed to create metric: {str(e)}")
+
+
+# User operations
+
+async def get_user_by_email(db: Any, email: str) -> Optional[User]:
+    """Get user by email.
+    
+    Args:
+        db: Prisma client
+        email: User email
+        
+    Returns:
+        User or None if not found
+    """
+    try:
+        return await db.user.find_unique(where={"email": email})
+    except Exception as e:
+        logger.error("Failed to get user by email", email=email, error=str(e))
+        raise DatabaseError(f"Failed to get user: {str(e)}")
+
+
+async def get_user_by_id(db: Any, user_id: str) -> Optional[User]:
+    """Get user by ID.
+    
+    Args:
+        db: Prisma client
+        user_id: User ID
+        
+    Returns:
+        User or None if not found
+    """
+    try:
+        return await db.user.find_unique(where={"id": user_id})
+    except Exception as e:
+        logger.error("Failed to get user by ID", user_id=user_id, error=str(e))
+        raise DatabaseError(f"Failed to get user: {str(e)}")
+
+
+# Project operations
+
+async def list_user_projects(
+    db: Any,
+    user_id: str,
+    skip: int = 0,
+    take: int = 50
+) -> List[Project]:
+    """List projects for a user.
+    
+    Args:
+        db: Prisma client
+        user_id: User ID
+        skip: Number of records to skip
+        take: Number of records to return
+        
+    Returns:
+        List of projects
+    """
+    try:
+        return await db.project.find_many(
+            where={"userId": user_id},
+            skip=skip,
+            take=take,
+            order={"createdAt": "desc"}
+        )
+    except Exception as e:
+        logger.error("Failed to list projects", user_id=user_id, error=str(e))
+        raise DatabaseError(f"Failed to list projects: {str(e)}")
+
+
+async def get_project(db: Any, project_id: str) -> Optional[Project]:
+    """Get project by ID.
+    
+    Args:
+        db: Prisma client
+        project_id: Project ID
+        
+    Returns:
+        Project or None if not found
+    """
+    try:
+        return await db.project.find_unique(where={"id": project_id})
+    except Exception as e:
+        logger.error("Failed to get project", project_id=project_id, error=str(e))
+        raise DatabaseError(f"Failed to get project: {str(e)}")

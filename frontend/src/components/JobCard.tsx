@@ -1,7 +1,11 @@
-import { Job } from '@/types';
-import { Calendar, Clock, Film, AlertCircle, CheckCircle, Loader2 } from 'lucide-react';
+'use client';
+
+import { useState } from 'react';
+import { Job } from '@/services/api';
+import { Calendar, Clock, Film, AlertCircle, CheckCircle, Loader2, XCircle, RefreshCw, X } from 'lucide-react';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { jobsApi } from '@/services/api';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -9,14 +13,19 @@ function cn(...inputs: ClassValue[]) {
 
 interface JobCardProps {
   job: Job;
+  onUpdate?: () => void;
 }
 
-export default function JobCard({ job }: JobCardProps) {
+export default function JobCard({ job, onUpdate }: JobCardProps) {
+  const [cancelling, setCancelling] = useState(false);
+  const [retrying, setRetrying] = useState(false);
+
   const statusColors = {
     queued: 'bg-gray-100 text-gray-800',
     processing: 'bg-blue-100 text-blue-800',
     completed: 'bg-green-100 text-green-800',
     failed: 'bg-red-100 text-red-800',
+    cancelled: 'bg-yellow-100 text-yellow-800',
   };
 
   const StatusIcon = {
@@ -24,7 +33,34 @@ export default function JobCard({ job }: JobCardProps) {
     processing: Loader2,
     completed: CheckCircle,
     failed: AlertCircle,
+    cancelled: XCircle,
   }[job.status];
+
+  const handleCancel = async () => {
+    if (!confirm('Are you sure you want to cancel this job?')) return;
+    
+    setCancelling(true);
+    try {
+      await jobsApi.cancel(job.id);
+      if (onUpdate) onUpdate();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to cancel job');
+    } finally {
+      setCancelling(false);
+    }
+  };
+
+  const handleRetry = async () => {
+    setRetrying(true);
+    try {
+      await jobsApi.retry(job.id);
+      if (onUpdate) onUpdate();
+    } catch (err) {
+      alert(err instanceof Error ? err.message : 'Failed to retry job');
+    } finally {
+      setRetrying(false);
+    }
+  };
 
   return (
     <div className="bg-white shadow rounded-lg overflow-hidden border border-gray-200">
@@ -74,6 +110,50 @@ export default function JobCard({ job }: JobCardProps) {
               className="w-full rounded-md border border-gray-200"
               poster={job.result.thumbnailUrl}
             />
+          </div>
+        )}
+
+        {(job.status === 'queued' || job.status === 'processing') && (
+          <div className="mt-4">
+            <button
+              onClick={handleCancel}
+              disabled={cancelling}
+              className="w-full flex items-center justify-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {cancelling ? (
+                <>
+                  <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                  Cancelling...
+                </>
+              ) : (
+                <>
+                  <X className="mr-2 h-4 w-4" />
+                  Cancel Job
+                </>
+              )}
+            </button>
+          </div>
+        )}
+
+        {(job.status === 'failed' || job.status === 'cancelled') && (
+          <div className="mt-4">
+            <button
+              onClick={handleRetry}
+              disabled={retrying}
+              className="w-full flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {retrying ? (
+                <>
+                  <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                  Retrying...
+                </>
+              ) : (
+                <>
+                  <RefreshCcw className="mr-2 h-4 w-4" />
+                  Retry Job
+                </>
+              )}
+            </button>
           </div>
         )}
       </div>

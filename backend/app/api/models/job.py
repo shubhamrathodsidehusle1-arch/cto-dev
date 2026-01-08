@@ -6,8 +6,12 @@ from pydantic import BaseModel, Field
 
 class JobCreate(BaseModel):
     """Job creation request."""
-    userId: str = Field(..., description="User ID")
     prompt: str = Field(..., min_length=1, max_length=5000, description="Video generation prompt")
+    projectId: Optional[str] = Field(None, description="Project ID (optional)")
+    model: Optional[str] = Field(None, description="AI model to use")
+    resolution: Optional[str] = Field("1080p", description="Video resolution (e.g., 1080p, 720p, 4k)")
+    quality: Optional[str] = Field("high", description="Video quality (e.g., high, medium, low)")
+    duration: Optional[int] = Field(None, ge=1, le=60, description="Video duration in seconds")
     metadata: Optional[Dict[str, Any]] = Field(default=None, description="Additional metadata")
     maxRetries: Optional[int] = Field(default=None, ge=0, le=10, description="Maximum retry attempts")
 
