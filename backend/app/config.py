@@ -1,6 +1,7 @@
 """Application configuration."""
-import os
+
 from typing import List
+
 from pydantic_settings import BaseSettings
 
 
@@ -46,7 +47,30 @@ class Settings(BaseSettings):
     
     # CORS
     CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:8000"]
-    
+
+    # Public URL (used for building download URLs returned to the frontend)
+    PUBLIC_BASE_URL: str = "http://localhost:8000"
+
+    # Providers
+    OPENROUTER_API_KEY: str = ""
+    OPENROUTER_BASE_URL: str = "https://openrouter.ai/api/v1"
+    OPENROUTER_DEFAULT_VIDEO_MODEL: str = ""
+    PROVIDER_TIMEOUT_SECONDS: int = 300
+    PROVIDER_FALLBACK_ORDER: List[str] = ["openrouter", "mock"]
+
+    # Video storage
+    VIDEO_STORAGE_PATH: str = "./storage/videos"
+    VIDEO_RETENTION_DAYS: int = 7
+
+    # Retries
+    RETRY_MAX_ATTEMPTS: int = 3
+
+    # Provider health
+    HEALTH_CHECK_INTERVAL_SECONDS: int = 60
+
+    # API rate limits
+    USER_JOB_CREATE_RATE_LIMIT_PER_MINUTE: int = 30
+
     # Task Queue Configuration
     DEFAULT_QUEUE_NAME: str = "default"
     HIGH_PRIORITY_QUEUE_NAME: str = "high_priority"

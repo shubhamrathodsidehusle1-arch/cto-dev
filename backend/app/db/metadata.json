@@ -1,6 +1,26 @@
 {
   "providers": [
     {
+      "provider": "openrouter",
+      "status": "unknown",
+      "costPerRequest": 0.0,
+      "metadata": {
+        "models": [],
+        "capabilities": ["video-generation"],
+        "notes": "Models are discovered dynamically via the OpenRouter /models endpoint"
+      }
+    },
+    {
+      "provider": "mock",
+      "status": "healthy",
+      "costPerRequest": 0.0,
+      "metadata": {
+        "models": ["mock-video-1"],
+        "capabilities": ["video-generation"],
+        "notes": "Local development fallback provider"
+      }
+    },
+    {
       "provider": "openai",
       "status": "healthy",
       "costPerRequest": 0.5,

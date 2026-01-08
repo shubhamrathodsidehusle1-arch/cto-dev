@@ -32,7 +32,7 @@ async def get_current_user(
     payload = decode_token(token)
     
     if payload is None:
-        logger.warning("Invalid or expired token", token_type=payload.get("type") if payload else None)
+        logger.warning("Invalid or expired token", token_type=None)
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid or expired token",

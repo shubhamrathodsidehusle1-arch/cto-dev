@@ -58,18 +58,25 @@ class ValidationError(APIError):
 
 class ProviderError(APIError):
     """Provider error."""
-    
+
     def __init__(self, provider: str, message: str):
         """Initialize provider error.
-        
+
         Args:
             provider: Provider name
             message: Error message
         """
         super().__init__(
             message=f"Provider {provider} error: {message}",
-            status_code=503
+            status_code=503,
         )
+
+
+class RateLimitError(APIError):
+    """Rate limit error."""
+
+    def __init__(self, message: str = "Rate limit exceeded"):
+        super().__init__(message=message, status_code=429)
 
 
 class DatabaseError(APIError):

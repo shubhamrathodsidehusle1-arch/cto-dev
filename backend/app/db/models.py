@@ -192,6 +192,36 @@ async def update_job_status(
         raise DatabaseError(f"Failed to update job status: {str(e)}")
 
 
+async def update_job_metadata(db: Any, job_id: str, metadata_patch: Dict[str, Any]) -> Job:
+    """Patch the Job.metadata JSON field.
+
+    Args:
+        db: Prisma client.
+        job_id: Job ID.
+        metadata_patch: Fields to merge into existing metadata.
+
+    Returns:
+        Updated job.
+
+    Raises:
+        DatabaseError: If update fails.
+    """
+
+    try:
+        job = await get_job(db=db, job_id=job_id)
+        if job is None:
+            raise DatabaseError(f"Job {job_id} not found")
+
+        current = job.metadata or {}
+        updated = {**current, **metadata_patch}
+
+        job = await db.job.update(where={"id": job_id}, data={"metadata": updated})
+        return job
+    except Exception as e:
+        logger.error("Failed to update job metadata", job_id=job_id, error=str(e))
+        raise DatabaseError(f"Failed to update job metadata: {str(e)}")
+
+
 async def delete_job(db: Any, job_id: str) -> None:
     """Delete job by ID.
     
@@ -243,7 +273,10 @@ async def get_job_stats(db: Any, user_id: Optional[str] = None) -> Dict[str, Any
             where={**where, "status": "completed", "generationTimeMs": {"not": None}},
         )
         if completed_jobs:
-            avg_gen_time = sum(j.generationTimeMs for j in completed_jobs if j.generationTimeMs) / len(completed_jobs)
+            avg_gen_time = (
+                sum(j.generationTimeMs for j in completed_jobs if j.generationTimeMs)
+                / len(completed_jobs)
+            )
             
         return {
             "total": total,
@@ -313,6 +346,16 @@ async def update_provider_health(
         )
         
         logger.info("Provider health updated", provider=provider, status=status)
+
+        try:
+            from app.monitoring.metrics import (
+                update_provider_health as update_provider_health_metric,
+            )
+
+            update_provider_health_metric(provider=provider, status=status)
+        except Exception:
+            pass
+
         return health
     except Exception as e:
         logger.error("Failed to update provider health", provider=provider, error=str(e))
